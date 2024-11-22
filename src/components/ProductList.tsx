@@ -7,33 +7,45 @@ const ProductList: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [skip, setSkip] = useState(0);
+  const [error, setError] = useState<string | null>(null); 
   const listRef = useRef<HTMLDivElement | null>(null);
-  const searchToken = useRef(0); // Lưu phiên bản request tìm kiếm
+  const searchToken = useRef(0);
 
   const LIMIT = 20;
+
   const loadProducts = async (skip: number) => {
-    setIsLoading(true);
-    const newProducts = await fetchProducts(skip, LIMIT);
-    setProducts((prev) => [...prev, ...newProducts]);
-    setIsLoading(false);
+    try {
+      setIsLoading(true);
+      const newProducts = await fetchProducts(skip, LIMIT);
+      setProducts((prev) => [...prev, ...newProducts]);
+    } catch (err) {
+      console.error("Error fetching products:", err);
+      setError("Failed to load products. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    const loadProducts = async () => {
+    const loadInitialProducts = async () => {
+      try {
         setIsLoading(true);
-        const products = await fetchProducts(0, LIMIT);
-        setProducts(products);
+        const initialProducts = await fetchProducts(0, LIMIT);
+        setProducts(initialProducts);
+      } catch (err) {
+        console.error("Error loading initial products:", err);
+        setError("Failed to load initial products. Please try again.");
+      } finally {
         setIsLoading(false);
-      };
-    
-      loadProducts();
+      }
+    };
+
+    loadInitialProducts();
   }, []);
 
- 
-
   const handleScroll = () => {
-    if (!listRef.current || query.trim()) return; 
-  
+    if (!listRef.current || query.trim()) return;
+
     const { scrollTop, scrollHeight, clientHeight } = listRef.current;
     if (scrollTop + clientHeight >= scrollHeight - 5 && !isLoading) {
       const nextSkip = skip + LIMIT;
@@ -41,22 +53,25 @@ const ProductList: React.FC = () => {
       loadProducts(nextSkip);
     }
   };
-  
 
   const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setQuery(value);
     setSkip(0);
 
-    const currentToken = ++searchToken.current; // Tăng phiên bản request hiện tại
+    const currentToken = ++searchToken.current; 
     if (value.trim()) {
-      console.log("Searching for products with query:", value);
-      const searchedProducts = await searchProducts(value);
+      try {
+        console.log("Searching for products with query:", value);
+        const searchedProducts = await searchProducts(value);
 
-      // Chỉ cập nhật danh sách nếu request này là mới nhất
-      if (currentToken === searchToken.current) {
-        console.log("Search results:", searchedProducts);
-        setProducts(searchedProducts);
+        if (currentToken === searchToken.current) {
+          console.log("Search results:", searchedProducts);
+          setProducts(searchedProducts);
+        }
+      } catch (err) {
+        console.error("Error searching products:", err);
+        setError("Failed to search products. Please try again.");
       }
     } else {
       console.log("Clearing search, reloading products...");
@@ -96,6 +111,7 @@ const ProductList: React.FC = () => {
           ))}
         </ul>
         {isLoading && <p className="text-center p-4">Loading...</p>}
+        {error && <p className="text-center text-red-500">{error}</p>}
       </div>
     </div>
   );
